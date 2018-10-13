@@ -42,9 +42,9 @@
             android:background="@null"
             android:hint="Adres, Miasto lub Kod Pocztowy"
             android:imeOptions="actionSearch"
+            android:singleLine="true"
             />
     </RelativeLayout>
-
 
     <ImageView
         android:layout_width="40dp"
@@ -52,10 +52,20 @@
         android:layout_below="@+id/relLayout1"
         android:layout_alignParentRight="true"
         android:layout_marginRight="10dp"
-        android:layout_marginTop="1dp"
+        android:layout_marginTop="10dp"
         android:scaleType="centerCrop"
         android:id="@+id/ic_gps"
         android:src="@drawable/ic_gps"
+        />
+
+
+    <Switch
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_below="@+id/relLayout1"
+        android:layout_alignParentLeft="true"
+        android:scaleType="centerCrop"
+        android:id="@+id/ic_satelite"
         />
 
 </RelativeLayout>
