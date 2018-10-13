@@ -17,6 +17,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -69,20 +70,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private static final float DEFAULT_ZOOM = 15f;
 
     //widgets
-    private EditText mSearchText;
+    private AutoCompleteTextView mSearchText;
     private ImageView mGps;
-
 
     //vars
     private Boolean mLocationPermissionsGranted = false;
     private GoogleMap mMap;
     private FusedLocationProviderClient mFusedLocationProviderClient;
+    private PlaceAutocompleteAdapter mPlaceAutocompleteAdapter;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
-        mSearchText = (EditText) findViewById(R.id.input_search);
+        mSearchText = (AutoCompleteTextView) findViewById(R.id.input_search);
         mGps = (ImageView) findViewById(R.id.ic_gps);
 
         getLocationPermission();
@@ -94,6 +95,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private void init()
     {
         Log.d(TAG, "init: Inicjalizacja...");
+
+        //mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter();
 
         mSearchText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
