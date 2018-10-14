@@ -1,6 +1,7 @@
 package dszymanski.com.googlemapsapp;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
@@ -27,18 +28,27 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.internal.PendingResultUtil;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.places.AutocompletePrediction;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.PlaceBuffer;
 import com.google.android.gms.location.places.Places;
+import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -48,8 +58,14 @@ import java.security.Key;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
+import dszymanski.com.googlemapsapp.models.PlaceInfo;
 
+public class MapActivity extends AppCompatActivity implements OnMapReadyCallback,GoogleApiClient.OnConnectionFailedListener {
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -79,10 +95,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private static final float DEFAULT_ZOOM = 15f;
     private static final LatLngBounds LAT_LNG_BOUNDS = new LatLngBounds(
             new LatLng(-40, -168), new LatLng(71, 136));
+    private static final int PLACE_PICKER_REQUEST = 1;
 
     //widgets
     private AutoCompleteTextView mSearchText;
-    private ImageView mGps;
+    private ImageView mGps, mPlacePicker,mInfo;
     private Switch mTypeChange;
 
     //vars
@@ -90,6 +107,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private GoogleMap mMap;
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private PlaceAutocompleteAdapter mPlaceAutocompleteAdapter;
+    private GoogleApiClient mGoogleApiClient;
+    private PlaceInfo mPlace;
+    private Marker mMarker;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -98,6 +118,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         mSearchText = (AutoCompleteTextView) findViewById(R.id.input_search);
         mGps = (ImageView) findViewById(R.id.ic_gps);
         mTypeChange = (Switch) findViewById(R.id.ic_satelite);
+        mPlacePicker = (ImageView) findViewById(R.id.place_picker);
+        mInfo = (ImageView) findViewById(R.id.place_info);
 
         getLocationPermission();
 
@@ -108,8 +130,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private void init() {
         Log.d(TAG, "init: Inicjalizacja...");
 
-        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(this, Places.getGeoDataClient(this, null), LAT_LNG_BOUNDS, null);
+        mGoogleApiClient = new GoogleApiClient
+                .Builder(this)
+                .addApi(Places.GEO_DATA_API)
+                .addApi(Places.PLACE_DETECTION_API)
+                .enableAutoManage(this, this)
+                .build();
 
+        mSearchText.setOnItemClickListener(mAutoCompleteClickListener);
+        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(this, Places.getGeoDataClient(this, null), LAT_LNG_BOUNDS, null);
         mSearchText.setAdapter(mPlaceAutocompleteAdapter);
 
         mSearchText.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -155,7 +184,57 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         });
 
+        mInfo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.d(TAG, "onClick: Kliknieto przycisk informacji");
+
+                try{
+                    if(mMarker.isInfoWindowShown()) {
+                        mMarker.hideInfoWindow();
+                    }
+                    else {
+                        mMarker.showInfoWindow();
+                    }
+
+                }
+                catch (NullPointerException e){
+                    Log.e(TAG, "onClick: NullPointerException" + e.getMessage()  );
+                }
+            }
+        });
+
+        mPlacePicker.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+
+                try {
+                    startActivityForResult(builder.build(MapActivity.this), PLACE_PICKER_REQUEST);
+                } catch (GooglePlayServicesRepairableException e) {
+                    Log.e(TAG, "onClick: GooglePlayServicesRepairableException: " + e.getMessage());
+                } catch (GooglePlayServicesNotAvailableException e) {
+                    Log.i(TAG, "onClick: GooglePlayServicesNotAvailableException: " + e.getMessage());
+                }
+            }
+        });
+
         hideSoftKeyboard();
+    }
+
+
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == PLACE_PICKER_REQUEST) {
+            if (resultCode == RESULT_OK) {
+                Place place = PlacePicker.getPlace(this,data);
+
+                PendingResult<PlaceBuffer> placeResult = Places.GeoDataApi
+                        .getPlaceById(mGoogleApiClient,place.getId());
+
+                placeResult.setResultCallback(mUpdatePlaceDetailsCallback);
+            }
+        }
     }
 
 
@@ -163,9 +242,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         Log.d(TAG, "geoLocate: Wyszukiwanie miejsca");
 
         String searchString = mSearchText.getText().toString();
-
         Geocoder geocoder = new Geocoder(MapActivity.this);
         List<Address> list = new ArrayList<>();
+
         try {
             list = geocoder.getFromLocationName(searchString, 1);
         } catch (IOException e) {
@@ -174,12 +253,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         if ((list.size() > 0)) {
             Address address = list.get(0);
-
             Log.d(TAG, "geoLocate: Znaleziono miejsce: " + address.toString());
-
-            String info = address.getAdminArea() + "," + address.getLatitude() + "," + address.getLongitude();
-
-            moveCamera(new LatLng(address.getLatitude(), address.getLongitude()), DEFAULT_ZOOM, address.getAddressLine(0), info);
+            moveCamera(new LatLng(address.getLatitude(), address.getLongitude()), DEFAULT_ZOOM, address.getAddressLine(0));
         }
     }
 
@@ -189,7 +264,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
         try {
             if (mLocationPermissionsGranted) {
+
                 final Task location = mFusedLocationProviderClient.getLastLocation();
+
                 location.addOnCompleteListener(new OnCompleteListener() {
                     @Override
                     public void onComplete(@NonNull Task task) {
@@ -197,10 +274,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             Log.d(TAG, "onComplete: Znaleziono lokalizacje");
                             Location currentLocation = (Location) task.getResult();
 
-                            //
-                            // Toast.makeText(MapActivity.this,currentLocation.getLatitude() + "," + currentLocation.getLongitude(),Toast.LENGTH_LONG).show();
+                             //Toast.makeText(MapActivity.this,currentLocation.getLatitude() + "," + currentLocation.getLongitude(),Toast.LENGTH_LONG).show();
 
-                            moveCamera(new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude()), DEFAULT_ZOOM, "Moja lokalizacja", null);
+                            moveCamera(new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude()), DEFAULT_ZOOM,"Moja lokalizacja");
                         } else {
                             Log.d(TAG, "onComplete: Nie znaleziono lokalizacji");
                             Toast.makeText(MapActivity.this, "Nie znaleziono lokalizacji", Toast.LENGTH_SHORT).show();
@@ -213,16 +289,51 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    private void moveCamera(LatLng latLng, float zoom, String title, String info) {
+    private void moveCamera(LatLng latLng, float zoom, String title)
+    {
+        Log.d(TAG, "moveCamera: Przemieszczenie kamery: " + latLng.latitude + "," + latLng.longitude);
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng,zoom));
+
+        if(!title.equals("Moja lokalizacja"))
+        {
+            MarkerOptions options = new MarkerOptions()
+                    .position(latLng)
+                    .title(title);
+            mMap.addMarker(options);
+        }
+
+        hideSoftKeyboard();
+    }
+
+
+    private void moveCamera(LatLng latLng, float zoom, PlaceInfo placeInfo) {
         Log.d(TAG, "moveCamera: Przemieszczenie kamery: " + latLng.latitude + "," + latLng.longitude);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
 
-        if (!title.equals("Moja lokalizacja")) {
-            MarkerOptions options = new MarkerOptions()
-                    .position(latLng)
-                    .title(title)
-                    .snippet(info);
-            mMap.addMarker(options);
+        mMap.clear();
+
+        mMap.setInfoWindowAdapter(new CustomInfoWindowAdapter(MapActivity.this));
+
+        if(placeInfo != null){
+            try{
+                String snippet = "Adres: " + placeInfo.getAddress() + "\n" +
+                        "Numer tel.: " + placeInfo.getPhoneNumber() + "\n" +
+                        "Strona: " + placeInfo.getWebsiteUri() + "\n";
+
+                MarkerOptions options = new MarkerOptions()
+                        .position(latLng)
+                        .title(placeInfo.getName())
+                        .snippet(snippet);
+
+                mMarker = mMap.addMarker(options);
+            }
+
+            catch (NullPointerException e){
+                Log.e(TAG, "moveCamera: NullPointerException" + e.getMessage() );
+            }
+        }
+        else {
+            mMap.addMarker(new MarkerOptions().position(latLng));
         }
 
         hideSoftKeyboard();
@@ -278,7 +389,57 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private void hideSoftKeyboard() {
         this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
     }
-}
 
+//--------------------------------------------------------------------
+
+
+    private AdapterView.OnItemClickListener mAutoCompleteClickListener = new AdapterView.OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+            hideSoftKeyboard();
+
+            final AutocompletePrediction item = mPlaceAutocompleteAdapter.getItem(i);
+            final String placeId = item.getPlaceId();
+
+            PendingResult<PlaceBuffer> placeResult = Places.GeoDataApi
+                    .getPlaceById(mGoogleApiClient,placeId);
+            placeResult.setResultCallback(mUpdatePlaceDetailsCallback);
+        }
+    };
+
+    private ResultCallback<PlaceBuffer> mUpdatePlaceDetailsCallback = new ResultCallback<PlaceBuffer>() {
+        @Override
+        public void onResult(@NonNull PlaceBuffer places) {
+            if(!places.getStatus().isSuccess()) {
+                Log.d(TAG, "onResult: Błąd miejsca: " + places.getStatus().toString());
+                places.release();
+                return;
+            }
+            final Place place = places.get(0);
+
+            try {
+                mPlace = new PlaceInfo();
+                mPlace.setName(place.getName().toString());
+                mPlace.setAddress(place.getAddress().toString());
+                mPlace.setId(place.getId());
+                mPlace.setLatLng(place.getLatLng());
+                mPlace.setPhoneNumber(place.getPhoneNumber().toString());
+                mPlace.setWebsiteUri(place.getWebsiteUri());
+
+                Log.d(TAG, "onResult: " + mPlace.toString());
+            }
+            catch (NullPointerException e)
+            {
+                Log.e(TAG, "onResult: NullPointerException" + e.getMessage() );
+            }
+
+            moveCamera(new LatLng(place.getViewport().getCenter().latitude,
+                    place.getViewport().getCenter().longitude),DEFAULT_ZOOM,mPlace);
+
+            places.release();
+        }
+    };
+
+}
 
 
