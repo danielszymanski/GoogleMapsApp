@@ -6,10 +6,42 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <ImageView
+        android:id="@+id/globe"
+        android:layout_width="0dp"
+        android:layout_height="500dp"
+        android:layout_marginTop="40dp"
+        android:background="@drawable/globe"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Mapa"
         android:id="@+id/btnMap"
-        />
+        android:layout_width="200dp"
+        android:layout_height="70dp"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="48dp"
+        android:text="Mapa"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/txtTitle" />
+
+    <TextView
+        android:id="@+id/txtTitle"
+        android:layout_width="242dp"
+        android:layout_height="117dp"
+        android:layout_marginTop="119dp"
+        android:layout_marginBottom="67dp"
+        android:text="Google Maps App"
+        android:textAlignment="center"
+        android:textColor="#000"
+        android:textSize="30dp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/btnMap"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
 </android.support.constraint.ConstraintLayout>
